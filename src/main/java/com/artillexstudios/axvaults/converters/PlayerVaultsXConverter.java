@@ -21,6 +21,7 @@ public class PlayerVaultsXConverter {
             int vaults = 0;
             int players = 0;
             for (File file : path.listFiles()) {
+                if (com.artillexstudios.axvaults.AxVaults.isStopping()) return;
                 if (!file.getName().endsWith(".yml")) continue;
                 final Config data = new Config(file);
                 UUID uuid;
@@ -33,6 +34,7 @@ public class PlayerVaultsXConverter {
 
                 VaultPlayer vaultPlayer = VaultManager.getPlayer(Bukkit.getOfflinePlayer(uuid)).join();
                 for (String route : data.getBackingDocument().getRoutesAsStrings(false)) {
+                    if (com.artillexstudios.axvaults.AxVaults.isStopping()) return;
                     final int num = Integer.parseInt(route.replace("vault", ""));
                     final Vault vault = new Vault(vaultPlayer, num, null, getItems(data.getString(route)));
                     VaultUtils.save(vault);

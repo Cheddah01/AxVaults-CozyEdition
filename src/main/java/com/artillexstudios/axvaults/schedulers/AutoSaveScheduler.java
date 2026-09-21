@@ -58,6 +58,8 @@ public class AutoSaveScheduler {
     public static void stop() {
         if (pool == null) return;
         pool.shutdown();
+        com.artillexstudios.axvaults.lifecycle.TaskQueue.awaitTermination(pool);
+        pool = null;
     }
 
     public static long getLastSaveLength() {

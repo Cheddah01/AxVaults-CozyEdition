@@ -19,6 +19,7 @@ public class InventoryCloseListener implements Listener {
 
     @EventHandler
     public void onClose(@NotNull InventoryCloseEvent event) {
+        if (AxVaults.isStopping()) return;
         if (!(PaperUtils.getHolder(event.getInventory(), false) instanceof Vault vault)) return;
 
         AxVaults.getThreadedQueue().submit(() -> {

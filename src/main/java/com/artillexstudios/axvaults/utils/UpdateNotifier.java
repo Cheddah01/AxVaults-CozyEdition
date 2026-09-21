@@ -27,6 +27,8 @@ public class UpdateNotifier implements Listener {
     private static String updateNotifier;
 
     private final String current;
+    private volatile HttpClient activeClient;
+    private volatile boolean stopped;
     private String latest = null;
     private boolean newest = true;
 
@@ -49,11 +51,13 @@ public class UpdateNotifier implements Listener {
 
         long time = 30L * 60L * 20L;
         Scheduler.get().runAsyncTimer(t -> {
+            if (stopped || AxVaults.isStopping()) return;
             this.latest = readVersion();
             this.newest = !isOutdated(current);
 
-            if (latest == null || newest) return;
+            if (stopped || AxVaults.isStopping() || latest == null || newest) return;
             Scheduler.get().runLaterAsync(t2 -> {
+                if (stopped || AxVaults.isStopping()) return;
                 Bukkit.getConsoleSender().sendMessage(getMessage());
             }, 50L);
             t.cancel();
@@ -66,6 +70,7 @@ public class UpdateNotifier implements Listener {
         if (!onJoin) return;
         if (!event.getPlayer().hasPermission(AxVaults.getInstance().getName().toLowerCase() + ".update-notify")) return;
         Scheduler.get().runLaterAsync(t -> {
+            if (stopped || AxVaults.isStopping()) return;
             event.getPlayer().sendMessage(getMessage());
         }, 50L);
     }
@@ -77,9 +82,17 @@ public class UpdateNotifier implements Listener {
         return StringUtils.formatToString(String.format("%s %s", prefix, updateNotifier), map);
     }
 
+    public void stop() {
+        stopped = true;
+        HttpClient client = activeClient;
+        if (client != null) client.shutdownNow();
+    }
+
     @Nullable
     private String readVersion() {
         try (HttpClient client = HttpClient.newHttpClient()) {
+            activeClient = client;
+            if (stopped) return null;
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(new URI("https://www.artillex-studios.com/api/v1/resource/%s/latest-version".formatted(AxVaults.getInstance().getName())))
                     .timeout(Duration.of(10, SECONDS))
@@ -91,6 +104,8 @@ public class UpdateNotifier implements Listener {
             return response.body().toString();
         } catch (Exception ex) {
             return null;
+        } finally {
+            activeClient = null;
         }
     }
 

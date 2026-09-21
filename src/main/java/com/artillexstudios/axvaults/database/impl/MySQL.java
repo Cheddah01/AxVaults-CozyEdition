@@ -116,7 +116,7 @@ public class MySQL implements Database {
                 stmt.setInt(2, vault.getId());
                 stmt.executeUpdate();
             } catch (SQLException ex) {
-                ex.printStackTrace();
+                throw new IllegalStateException("Failed to save vault " + vault.getId() + " for " + vault.getUUID(), ex);
             }
             return;
         }
@@ -154,7 +154,7 @@ public class MySQL implements Database {
                 }
             }
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            throw new IllegalStateException("Failed to save vault " + vault.getId() + " for " + vault.getUUID(), ex);
         }
     }
 
@@ -343,7 +343,10 @@ public class MySQL implements Database {
     @Override
     public void disable() {
         try {
-            dataSource.close();
+            if (dataSource != null) {
+                dataSource.close();
+                dataSource = null;
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
         }

@@ -116,6 +116,7 @@ public class Vault implements InventoryHolder {
         }
 
         ThreadUtils.runSync(player, () -> {
+            if (AxVaults.isStopping()) return;
             changed.set(true);
             // recalculate vault if the row count has changed
             if (vaultPlayer.getRows() * 9 != storage.getSize()) {

@@ -30,6 +30,7 @@ public class VaultManager {
     }
 
     public static void loadPlayer(@NotNull OfflinePlayer offlinePlayer) {
+        if (AxVaults.isStopping()) return;
         if (players.containsKey(offlinePlayer.getUniqueId())) return;
 
         VaultPlayer vaultPlayer = new VaultPlayer(offlinePlayer.getUniqueId());
@@ -38,6 +39,7 @@ public class VaultManager {
 
     // the future is always completed from the main thread
     public static CompletableFuture<VaultPlayer> getPlayer(@NotNull OfflinePlayer offlinePlayer) {
+        if (AxVaults.isStopping()) return CompletableFuture.failedFuture(new IllegalStateException("AxVaults is stopping"));
         CompletableFuture<VaultPlayer> loading = loadingPlayers.get(offlinePlayer.getUniqueId());
         if (loading != null) return loading;
 

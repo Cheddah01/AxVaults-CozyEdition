@@ -5,6 +5,7 @@ import com.artillexstudios.axapi.reflection.ClassUtils;
 import com.artillexstudios.axapi.utils.Cooldown;
 import com.artillexstudios.axapi.utils.ItemBuilder;
 import com.artillexstudios.axapi.utils.StringUtils;
+import com.artillexstudios.axvaults.AxVaults;
 import com.artillexstudios.axvaults.utils.SoundUtils;
 import com.artillexstudios.axvaults.utils.ThreadUtils;
 import com.artillexstudios.axvaults.vaults.Vault;
@@ -40,6 +41,7 @@ public class ItemPicker {
     }
 
     public void open(@NotNull Vault vault, int oldPage, int cPage) {
+        if (AxVaults.isStopping()) return;
         int rows = CONFIG.getInt("item-picker-rows", 6);
         int pageSize = rows * 9 - 9;
 
@@ -113,8 +115,13 @@ public class ItemPicker {
         }
 
         ThreadUtils.runSync(player, () -> {
+            if (AxVaults.isStopping()) return;
             gui.open(player, cPage);
         });
+    }
+
+    public static void clearCooldowns() {
+        cooldown.clear();
     }
 
     private static boolean getOrAddCooldown(Player player) {

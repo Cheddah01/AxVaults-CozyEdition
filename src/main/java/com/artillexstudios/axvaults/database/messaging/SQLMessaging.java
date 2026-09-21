@@ -34,5 +34,7 @@ public class SQLMessaging {
     public static void stop() {
         if (executor == null) return;
         executor.shutdown();
+        com.artillexstudios.axvaults.lifecycle.TaskQueue.awaitTermination(executor);
+        executor = null;
     }
 }

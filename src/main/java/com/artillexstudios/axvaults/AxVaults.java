@@ -3,7 +3,13 @@ package com.artillexstudios.axvaults;
 import com.artillexstudios.axapi.AxPlugin;
 import com.artillexstudios.axapi.config.Config;
 import com.artillexstudios.axapi.dependencies.DependencyManagerWrapper;
-import com.artillexstudios.axapi.executor.ThreadedQueue;
+import com.artillexstudios.axvaults.lifecycle.TaskQueue;
+import com.artillexstudios.axvaults.lifecycle.JdbcCleanup;
+import com.artillexstudios.axvaults.utils.ThreadUtils;
+import com.artillexstudios.axvaults.placed.PlacedVaults;
+import dev.triumphteam.gui.guis.BaseGui;
+import org.bukkit.event.HandlerList;
+import com.artillexstudios.axapi.scheduler.Scheduler;
 import com.artillexstudios.axapi.libs.boostedyaml.dvs.versioning.BasicVersioning;
 import com.artillexstudios.axapi.libs.boostedyaml.settings.dumper.DumperSettings;
 import com.artillexstudios.axapi.libs.boostedyaml.settings.general.GeneralSettings;
@@ -36,7 +42,6 @@ import com.artillexstudios.axvaults.vaults.Vault;
 import com.artillexstudios.axvaults.vaults.VaultManager;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.HumanEntity;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -44,16 +49,18 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public final class AxVaults extends AxPlugin {
-    private static boolean stopping = false;
+    private static volatile boolean stopping = false;
     public static Config CONFIG;
     public static Config MESSAGES;
     public static MessageUtils MESSAGEUTILS;
     private static AxPlugin instance;
-    private static ThreadedQueue<Runnable> threadedQueue;
+    private static TaskQueue threadedQueue;
     private static Database database;
     private static AxMetrics metrics;
+    private Metrics bstats;
+    private UpdateNotifier updateNotifier;
 
-    public static ThreadedQueue<Runnable> getThreadedQueue() {
+    public static TaskQueue getThreadedQueue() {
         return threadedQueue;
     }
 
@@ -76,14 +83,16 @@ public final class AxVaults extends AxPlugin {
     }
 
     public void enable() {
-        new Metrics(this, 20541);
+        instance = this;
+        stopping = false;
+        bstats = new Metrics(this, 20541);
 
         CONFIG = new Config(new File(getDataFolder(), "config.yml"), getResource("config.yml"), GeneralSettings.builder().setUseDefaults(false).build(), LoaderSettings.builder().setAutoUpdate(true).build(), DumperSettings.DEFAULT, UpdaterSettings.builder().setKeepAll(true).setVersioning(new BasicVersioning("version")).build());
         MESSAGES = new Config(new File(getDataFolder(), "messages.yml"), getResource("messages.yml"), GeneralSettings.builder().setUseDefaults(false).build(), LoaderSettings.builder().setAutoUpdate(true).build(), DumperSettings.DEFAULT, UpdaterSettings.builder().setKeepAll(true).setVersioning(new BasicVersioning("version")).build());
 
         MESSAGEUTILS = new MessageUtils(MESSAGES.getBackingDocument(), "prefix", CONFIG.getBackingDocument());
 
-        threadedQueue = new ThreadedQueue<>("AxVaults-Datastore-thread");
+        threadedQueue = new TaskQueue("AxVaults-Datastore-thread");
 
         VaultUtils.reload();
         HookManager.setupHooks();
@@ -117,28 +126,73 @@ public final class AxVaults extends AxPlugin {
         Bukkit.getConsoleSender().sendMessage(StringUtils.formatToString("&#55ff00[AxVaults] Loaded plugin!"));
 
         UpdateNotifier.init(CONFIG, MESSAGES);
-        if (CONFIG.getBoolean("update-notifier.enabled", true)) new UpdateNotifier();
+        if (CONFIG.getBoolean("update-notifier.enabled", true)) updateNotifier = new UpdateNotifier();
     }
 
     public void disable() {
         stopping = true;
-        if (metrics != null) metrics.cancel();
-        for (Vault vault : VaultManager.getVaults()) {
-            for (HumanEntity humanEntity : new ArrayList<>(vault.getInventory().getViewers())) {
-                humanEntity.closeInventory();
-            }
-        }
+        cleanup("commands", CommandManager::unload);
+        cleanup("autosave scheduler", AutoSaveScheduler::stop);
+        cleanup("SQL messaging", SQLMessaging::stop);
+        cleanup("converter", com.artillexstudios.axvaults.commands.subcommands.Converter.INSTANCE::stop);
+        cleanup("update notifier", () -> { if (updateNotifier != null) updateNotifier.stop(); });
+        cleanup("AxMetrics", () -> { if (metrics != null) metrics.cancel(); });
+        cleanup("bStats", () -> { if (bstats != null) bstats.shutdown(); });
 
-        AutoSaveScheduler.stop();
-        List<CompletableFuture<?>> futures = new ArrayList<>();
-        for (Vault vault : VaultManager.getVaults()) {
-            futures.add(VaultUtils.save(vault));
+        // Close both editable vaults and decorative menus before removing GUI listeners.
+        for (var player : Bukkit.getOnlinePlayers()) {
+            cleanup("open menu for " + player.getName(), () -> {
+                var holder = player.getOpenInventory().getTopInventory().getHolder();
+                if (holder instanceof BaseGui gui) gui.close(player, false);
+                else if (holder instanceof Vault) player.closeInventory();
+            });
         }
+        cleanup("scheduled tasks", () -> Scheduler.get().cancelAll());
 
-        CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
-        SQLMessaging.stop();
-        database.disable();
-        threadedQueue.stop();
+        if (threadedQueue != null) {
+            cleanup("vault save pipeline", () -> {
+                try {
+                    // Finish old snapshots/writes before taking the final snapshot.
+                    threadedQueue.drain(ThreadUtils::drainSync);
+                    List<CompletableFuture<Void>> saves = new ArrayList<>();
+                    for (Vault vault : VaultManager.getVaults()) {
+                        saves.add(VaultUtils.save(vault).exceptionally(ex -> {
+                            getLogger().log(java.util.logging.Level.SEVERE,
+                                    "Could not save vault " + vault.getId() + " for " + vault.getUUID(), ex);
+                            return null;
+                        }));
+                    }
+                    threadedQueue.drain(ThreadUtils::drainSync);
+                    CompletableFuture.allOf(saves.toArray(CompletableFuture[]::new)).join();
+                } finally {
+                    threadedQueue.drain(ThreadUtils::drainSync);
+                    threadedQueue.stop();
+                }
+            });
+        }
+        cleanup("database", () -> { if (database != null) database.disable(); });
+        cleanup("placeholder hooks", HookManager::stop);
+        cleanup("JDBC drivers", () -> JdbcCleanup.release(getClass().getClassLoader()));
+        cleanup("listeners", () -> HandlerList.unregisterAll(this));
+        VaultManager.getLoadingPlayers().values().forEach(future -> future.cancel(false));
+        VaultManager.getLoadingPlayers().clear();
+        VaultManager.getPlayers().clear();
+        PlacedVaults.getVaults().clear();
+        com.artillexstudios.axvaults.guis.VaultSelector.clearCooldowns();
+        com.artillexstudios.axvaults.guis.ItemPicker.clearCooldowns();
+        database = null;
+        threadedQueue = null;
+        metrics = null;
+        bstats = null;
+        updateNotifier = null;
+    }
+
+    private void cleanup(String resource, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception ex) {
+            getLogger().log(java.util.logging.Level.SEVERE, "Failed to release " + resource, ex);
+        }
     }
 
     public void updateFlags() {

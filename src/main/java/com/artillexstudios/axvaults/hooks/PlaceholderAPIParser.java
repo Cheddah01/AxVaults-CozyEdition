@@ -7,6 +7,14 @@ import java.util.List;
 
 public class PlaceholderAPIParser implements Placeholders {
 
+    public static void unregisterOwnedExpansions() {
+        var manager = me.clip.placeholderapi.PlaceholderAPIPlugin.getInstance().getLocalExpansionManager();
+        var owner = PlaceholderAPIParser.class.getClassLoader();
+        for (var expansion : new java.util.ArrayList<>(manager.getExpansions())) {
+            if (expansion.getClass().getClassLoader() == owner) expansion.unregister();
+        }
+    }
+
     @Override
     public String setPlaceholders(OfflinePlayer player, String txt) {
         return PlaceholderAPI.setPlaceholders(player, txt);

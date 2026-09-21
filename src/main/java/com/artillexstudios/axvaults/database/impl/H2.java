@@ -79,7 +79,7 @@ public class H2 implements Database {
                 stmt.setInt(2, vault.getId());
                 stmt.executeUpdate();
             } catch (SQLException ex) {
-                ex.printStackTrace();
+                throw new IllegalStateException("Failed to save vault " + vault.getId() + " for " + vault.getUUID(), ex);
             }
             return;
         }
@@ -117,7 +117,7 @@ public class H2 implements Database {
                 }
             }
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            throw new IllegalStateException("Failed to save vault " + vault.getId() + " for " + vault.getUUID(), ex);
         }
     }
 
@@ -221,7 +221,10 @@ public class H2 implements Database {
     @Override
     public void disable() {
         try {
-            conn.close();
+            if (conn != null) {
+                conn.close();
+                conn = null;
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
         }

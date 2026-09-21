@@ -43,6 +43,7 @@ public class VaultSelector {
     }
 
     public void open(int page) {
+        if (AxVaults.isStopping()) return;
         int rows = CONFIG.getInt("vault-selector-rows", 6);
         int pageSize = rows * 9 - 9;
 
@@ -63,8 +64,9 @@ public class VaultSelector {
         final int[] loadedThrough = {pageSize * (page + 1)};
         for (int i = 0; i < loadedThrough[0]; i++) {
             getItemOfVault(player, i + 1, gui, promote, promotionNumber).thenAccept(guiItem -> {
-                if (guiItem == null) return;
+                if (guiItem == null || AxVaults.isStopping()) return;
                 ThreadUtils.runSync(player, () -> {
+                    if (AxVaults.isStopping()) return;
                     gui.addItem(guiItem);
                     gui.update();
                 });
@@ -91,8 +93,9 @@ public class VaultSelector {
                 int loadUntil = (gui.getCurrentPageNum() + 1) * pageSize;
                 for (int num = loadedThrough[0] + 1; num <= loadUntil; num++) {
                     getItemOfVault(player, num, gui, promote, promotionNumber).thenAccept(guiItem -> {
-                        if (guiItem == null) return;
+                        if (guiItem == null || AxVaults.isStopping()) return;
                         ThreadUtils.runSync(player, () -> {
+                            if (AxVaults.isStopping()) return;
                             gui.addItem(guiItem);
                             gui.update();
                         });
@@ -114,6 +117,7 @@ public class VaultSelector {
         }
 
         ThreadUtils.runSync(player, () -> {
+            if (AxVaults.isStopping()) return;
             gui.open(player, page);
         });
     }
@@ -219,6 +223,10 @@ public class VaultSelector {
             }
         });
         return cf;
+    }
+
+    public static void clearCooldowns() {
+        cooldown.clear();
     }
 
     private static boolean getOrAddCooldown(Player player) {

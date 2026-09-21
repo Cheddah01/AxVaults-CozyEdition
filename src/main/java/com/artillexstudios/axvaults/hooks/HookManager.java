@@ -15,6 +15,13 @@ public class HookManager {
         }
     }
 
+    public static void stop() {
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            PlaceholderAPIParser.unregisterOwnedExpansions();
+        }
+        placeholderParser = null;
+    }
+
     public static Placeholders getPlaceholderParser() {
         return placeholderParser;
     }

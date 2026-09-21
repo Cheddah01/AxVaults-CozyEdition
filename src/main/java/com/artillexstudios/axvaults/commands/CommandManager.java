@@ -40,6 +40,12 @@ public class CommandManager {
         reload();
     }
 
+    public static void unload() {
+        if (handler == null) return;
+        handler.unregisterAllCommands();
+        handler = null;
+    }
+
     public static void reload() {
         handler.unregisterAllCommands();
 
