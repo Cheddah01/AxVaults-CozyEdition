@@ -6,6 +6,7 @@ import com.artillexstudios.axapi.utils.Cooldown;
 import com.artillexstudios.axapi.utils.ItemBuilder;
 import com.artillexstudios.axapi.utils.StringUtils;
 import com.artillexstudios.axvaults.AxVaults;
+import com.artillexstudios.axvaults.utils.PermissionUtils;
 import com.artillexstudios.axvaults.utils.ThreadUtils;
 import com.artillexstudios.axvaults.vaults.Vault;
 import com.artillexstudios.axvaults.vaults.VaultPlayer;
@@ -19,6 +20,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static com.artillexstudios.axvaults.AxVaults.CONFIG;
@@ -55,11 +58,16 @@ public class VaultSelector {
                 .disableAllInteractions()
                 .create();
 
-        for (int i = 0; i < pageSize * (page + 1); i++) {
-            getItemOfVault(player, i + 1, gui).thenAccept(guiItem -> {
+        final boolean promote = CONFIG.getBoolean("unlock-more-vaults", true);
+        final int promotionNumber = promote ? getPromotionNumber() : -1;
+        final int[] loadedThrough = {pageSize * (page + 1)};
+        for (int i = 0; i < loadedThrough[0]; i++) {
+            getItemOfVault(player, i + 1, gui, promote, promotionNumber).thenAccept(guiItem -> {
                 if (guiItem == null) return;
-                gui.addItem(guiItem);
-                gui.update();
+                ThreadUtils.runSync(player, () -> {
+                    gui.addItem(guiItem);
+                    gui.update();
+                });
             });
         }
 
@@ -80,13 +88,17 @@ public class VaultSelector {
                 if (getOrAddCooldown((Player) event.getWhoClicked())) return;
                 gui.next();
 
-                for (int i = 0; i < pageSize; i++) {
-                    getItemOfVault(player, (gui.getCurrentPageNum() * pageSize) + i + 1, gui).thenAccept(guiItem -> {
+                int loadUntil = (gui.getCurrentPageNum() + 1) * pageSize;
+                for (int num = loadedThrough[0] + 1; num <= loadUntil; num++) {
+                    getItemOfVault(player, num, gui, promote, promotionNumber).thenAccept(guiItem -> {
                         if (guiItem == null) return;
-                        gui.addItem(guiItem);
-                        gui.update();
+                        ThreadUtils.runSync(player, () -> {
+                            gui.addItem(guiItem);
+                            gui.update();
+                        });
                     });
                 }
+                loadedThrough[0] = Math.max(loadedThrough[0], loadUntil);
             });
             gui.setItem(rows, 7, item2);
         }
@@ -106,7 +118,34 @@ public class VaultSelector {
         });
     }
 
-    private CompletableFuture<GuiItem> getItemOfVault(@NotNull Player player, int num, @NotNull PaginatedGui gui) {
+    // Include separately granted vaults and saved vaults; the permission check below
+    // ensures revoked permissions do not move the promotion past inaccessible vaults.
+    int getPromotionNumber() {
+        Set<Integer> candidates = new HashSet<>(vaultPlayer.getVaultMap().keySet());
+        candidates.add(1);
+        player.getEffectivePermissions().forEach(permission -> {
+            if (!permission.getValue() || !permission.getPermission().startsWith("axvaults.vault.")) return;
+            try {
+                int number = Integer.parseInt(permission.getPermission().substring("axvaults.vault.".length()));
+                if (number > 0) candidates.add(number);
+            } catch (NumberFormatException ignored) {
+                // Wildcards are handled by the access check beyond the highest candidate.
+            }
+        });
+        int limit = CONFIG.getInt("max-vault-amount", -1);
+        if (limit >= 0) candidates.add(limit);
+        int highest = 0;
+        for (int number : candidates) {
+            if (number > highest && (limit < 0 || number <= limit)
+                    && PermissionUtils.hasPermission(player, number)) highest = number;
+        }
+        if (highest == Integer.MAX_VALUE || (limit >= 0 && highest >= limit)) return -1;
+        // Operators and wildcard holders can have unbounded access: no upgrade prompt.
+        return PermissionUtils.hasPermission(player, highest + 1) ? -1 : highest + 1;
+    }
+
+    private CompletableFuture<GuiItem> getItemOfVault(@NotNull Player player, int num, @NotNull PaginatedGui gui,
+                                                       boolean promote, int promotionNumber) {
         int maxVaults = CONFIG.getInt("max-vault-amount");
         if (maxVaults != -1 && num > maxVaults) {
             return CompletableFuture.completedFuture(null);
@@ -156,6 +195,12 @@ public class VaultSelector {
                 });
                 cf.complete(guiItem);
             } else {
+                if (promote) {
+                    Section section = MESSAGES.getSection("guis.selector.item-unlock-more");
+                    cf.complete(num == promotionNumber && section != null
+                            ? new GuiItem(ItemBuilder.create(section).get()) : null);
+                    return;
+                }
                 if (!CONFIG.getBoolean("show-locked-vaults", true)) {
                     cf.complete(null);
                     return;

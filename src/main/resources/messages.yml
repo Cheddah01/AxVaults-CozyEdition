@@ -30,6 +30,15 @@ guis:
         - " "
         - "&#55ff00&l(!) &#55ff00Click - Open Vault"
         - "&#55ff00&l(!) &#55ff00Shift + Click - Change Item"
+    item-unlock-more:
+      material: NETHER_STAR
+      name: "&#FFCC00&lUnlock More Vaults"
+      glow: true
+      lore:
+        - " "
+        - "&fNeed more storage?"
+        - "&7Rank up or purchase a premium rank"
+        - "&7to unlock more personal vaults!"
     item-locked:
       material: RED_STAINED_GLASS_PANE
       name: "&#FF0000&lVault #%num%"
@@ -122,4 +131,4 @@ commands:
 update-notifier: "&#BBFF88There is a new version of AxVaults available! &#DDDDDD(&#FFFFFFcurrent: &#FF0000%current% &#DDDDDD| &#FFFFFFlatest: &#00FF00%latest%&#DDDDDD)"
 
 # do not change this
-version: 10
+version: 11

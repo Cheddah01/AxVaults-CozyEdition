@@ -28,6 +28,10 @@ database:
 # 1 - the highest permission will give all the previous vaults (axvaults.vault.10 will give access to vaults #1-#10)
 permission-mode: 0
 
+# show one configurable rank-up/premium-rank item after the last unlocked vault
+# replaces locked vault items; disable to restore show-locked-vaults behavior
+unlock-more-vaults: true
+
 # should vaults that the player can't access be shown in the selector gui?
 show-locked-vaults: true
 
@@ -119,4 +123,4 @@ update-notifier:
 debug: false
 
 # do not change this
-version: 11
+version: 12
