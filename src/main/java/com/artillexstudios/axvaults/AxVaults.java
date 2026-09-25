@@ -126,7 +126,8 @@ public final class AxVaults extends AxPlugin {
         Bukkit.getConsoleSender().sendMessage(StringUtils.formatToString("&#55ff00[AxVaults] Loaded plugin!"));
 
         UpdateNotifier.init(CONFIG, MESSAGES);
-        if (CONFIG.getBoolean("update-notifier.enabled", true)) updateNotifier = new UpdateNotifier();
+        // Cozy builds are maintained separately; upstream replacements would remove our customizations.
+        // Keep the existing configuration key intact for compatibility, but do not start its notifier.
     }
 
     public void disable() {
