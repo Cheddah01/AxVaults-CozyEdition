@@ -2,21 +2,22 @@
 
 ## One JAR for Paper 26.2 and 26.3
 
-Version **2.16.3-cozy.1** uses Java 25 and is compiled against Paper
+Version **2.16.3-cozy.2** uses Java 25 and is compiled against Paper
 26.2 build 117. The same compiled classes pass the regression suite on Paper
-26.3 build 40 alpha. Install the shaded `target/AxVaults-2.16.3-cozy.1.jar`.
+26.3 build 151 beta. Install the shaded `target/AxVaults-2.16.3-cozy.2.jar`.
 The plugin name and data folder remain **AxVaults**; retain your existing files.
 
-This fork is based on [upstream 2.16.0, commit 08b7fee](https://github.com/Artillex-Studios/AxVaults/commit/08b7fee8b4b652b5bd7105920dcf0e9e807bdc54),
-which was still upstream master when checked on 2026-09-25. No upstream merge
-was needed. The custom upgrade prompt and save/shutdown changes remain intact.
-Stock update notifications are disabled even if the old configuration enables
-them. Update from this fork so those customizations are retained.
+This fork includes [upstream 2.16.1, commit 7a9167d](https://github.com/Artillex-Studios/AxVaults/commit/7a9167de4fd08bad7ac43059c816c1434b5a5b56),
+checked against upstream master on 2026-10-09. The custom upgrade prompt and
+save/shutdown changes remain intact. Stock update notifications are disabled
+even if the old configuration enables them. Update from this fork so those
+customizations are retained. The Cozy version stays above previous fork releases.
 
-AxAPI 2.2.0-DEV-NEW-VERSION-5 remains unchanged. It selects and downloads the
-matching official 26.2 or 26.3 native adapter at startup; both artifacts were
-verified available. This is normal library loading, not a replacement of your
-fork JAR. First startup needs access to the existing library repositories.
+Upstream now allows removing blacklisted items already stored in a vault and
+updates AxAPI to 2.2.0-DEV-NEW-VERSION-7. Existing configuration, database schema,
+and player data are retained without a migration. AxAPI loads its matching
+native adapter at startup; first startup needs access to the library repositories.
+The updated adapter and item handling still need live server verification.
 
 Automated checks cover selector permissions/promotion placement, queued saves,
 failed saves, and H2/SQLite storage close/reopen preservation. They do not run
@@ -30,7 +31,10 @@ the full server item serializer, native adapter, or MySQL. Before production:
    vault, restart, and verify exact contents, metadata, amounts and icons.
 4. On 26.3, repeat with a new 26.3 material. Do not move that upgraded vault
    database back to 26.2: a shared plugin JAR does not make new items downgrade-safe.
-5. Check startup for adapter/library errors and saving for database errors.
+5. Check removing an already-stored blacklisted item, including with a full
+   inventory, and confirm blacklisted items cannot be added using shift-click,
+   number keys, offhand swaps, or dragging.
+6. Check startup for adapter/library errors and saving for database errors.
 
 **Bug Reports and Feature Requests:** https://github.com/Artillex-Studios/Issues
 

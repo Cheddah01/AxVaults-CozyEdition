@@ -82,6 +82,7 @@ public final class AxVaults extends AxPlugin {
         Libraries.load(instance, manager);
     }
 
+    @Override
     public void enable() {
         instance = this;
         stopping = false;
@@ -130,6 +131,7 @@ public final class AxVaults extends AxPlugin {
         // Keep the existing configuration key intact for compatibility, but do not start its notifier.
     }
 
+    @Override
     public void disable() {
         stopping = true;
         cleanup("commands", CommandManager::unload);
@@ -196,6 +198,7 @@ public final class AxVaults extends AxPlugin {
         }
     }
 
+    @Override
     public void updateFlags() {
         FeatureFlags.LOGGER_NAME_FORMAT.set(LoggerNameFormat.NAMEABLE);
     }

@@ -1,5 +1,13 @@
 # Cozy Edition changelog
 
+## 2.16.3-cozy.2 — 2026-10-09
+
+- Merge upstream 2.16.1 (`7a9167d`), including removal of blacklisted items already stored in vaults.
+- Update AxAPI from 2.2.0-DEV-NEW-VERSION-5 to 2.2.0-DEV-NEW-VERSION-7.
+- Preserve the Cozy upgrade prompt, save/shutdown cleanup, disabled stock notifier, Java 25 and Paper 26.2 target.
+- Keep existing configuration and vault data without schema changes or migration.
+- Verify the build and 17 regression tests on Paper 26.2; run the same compiled tests against Paper 26.3 build 151 beta. Live blacklist interactions, item serialization, native adapter loading, PlugManX and MySQL still need server checks.
+
 ## 2.16.3-cozy.1 — 2026-09-25
 
 - Build against Paper 26.2 build 117 and Java 25, with API 26.2, for a single JAR on Paper 26.2 and 26.3.
